@@ -1,0 +1,132 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+/* Theme variables */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    @apply antialiased selection:bg-amber-500/30 selection:text-amber-200;
+    font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif;
+  }
+}
+
+.glass {
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: rgba(30, 41, 59, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-card:hover {
+  border-color: rgba(245, 158, 11, 0.25);
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.05);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Print CSS */
+@media print {
+  /* Reset layout constraints for fluid printing */
+  html, 
+  body, 
+  #root, 
+  main, 
+  .flex-1 {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-family: 'Outfit', sans-serif;
+  }
+
+  /* Prevent flex layouts from compressing tables */
+  .flex,
+  .lg\:flex-row {
+    display: block !important;
+  }
+
+  /* Table alignments for PDF print */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-top: 15px !important;
+    color: #000000 !important;
+  }
+
+  th, td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 8px 12px !important;
+    text-align: left !important;
+    color: #000000 !important;
+    background: transparent !important;
+    white-space: normal !important; /* Allow cell text wrapping */
+  }
+
+  th {
+    font-weight: 700 !important;
+    background-color: #f1f5f9 !important;
+    text-transform: uppercase !important;
+    font-size: 10px !important;
+  }
+
+  td {
+    font-size: 11px !important;
+  }
+
+  /* Prevent row splitting across pages */
+  tr {
+    page-break-inside: avoid !important;
+  }
+
+  /* Hiding rules (placed at bottom with high specificity to override resets) */
+  .no-print, 
+  .print-hidden,
+  .print\:hidden,
+  div.no-print,
+  div.print-hidden,
+  div.print\:hidden,
+  aside, 
+  header, 
+  button,
+  .no-print * {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    height: 0 !important;
+    width: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+  }
+}
