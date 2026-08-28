@@ -26,6 +26,7 @@ export default function NightAudit() {
   
   // Status info
   const [businessDate, setBusinessDate] = useState('');
+  const [serverTime, setServerTime] = useState(null); // Date object kept in sync locally
   const [lastAudit, setLastAudit] = useState(null);
   const [pendingArrivals, setPendingArrivals] = useState([]);
   const [pendingDepartures, setPendingDepartures] = useState([]);
@@ -56,6 +57,30 @@ export default function NightAudit() {
   useEffect(() => {
     loadStatus();
   }, []);
+
+  // Keep a local, ticking serverTime so the UI updates every second without polling the API.
+  useEffect(() => {
+    // Initialize serverTime from businessDate when it arrives.
+    if (!businessDate) {
+      setServerTime(null);
+      return;
+    }
+    const initial = new Date(businessDate);
+    if (Number.isNaN(initial.getTime())) {
+      setServerTime(null);
+      return;
+    }
+    setServerTime(initial);
+
+    const id = setInterval(() => {
+      setServerTime(prev => {
+        if (!prev) return new Date();
+        return new Date(prev.getTime() + 1000);
+      });
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [businessDate]);
 
   const handleRunAudit = async () => {
     const hasWarnings = pendingArrivals.length > 0 || pendingDepartures.length > 0;
@@ -89,6 +114,30 @@ export default function NightAudit() {
       month: 'long',
       day: 'numeric'
     });
+  };
+
+  const formatBusinessDateTime = (value) => {
+    if (!value) return 'Loading...';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'medium'
+    });
+  };
+
+  const formatDateOnly = (value) => {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString();
+  };
+
+  const formatTimeOnly = (value) => {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   };
 
   return (
@@ -129,13 +178,16 @@ export default function NightAudit() {
           <div className="lg:col-span-1 space-y-6">
             {/* Active Business Date Card */}
             <div className="glass-card p-6 rounded-2xl border-l-4 border-amber-500 space-y-4">
-              <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest block">Active Business Date</span>
-              <h2 className="text-2xl font-extrabold text-slate-100 flex items-center gap-2.5">
-                <Calendar className="text-amber-400" size={24} />
-                {businessDate ? new Date(businessDate).toLocaleDateString() : 'Loading...'}
+              <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest block">Server Date & Time</span>
+              <h2 className="text-xl font-extrabold text-slate-100 flex items-center gap-3">
+                <Calendar className="text-amber-400" size={20} />
+                <div>
+                  <span className="text-lg font-semibold">{formatBusinessDateTime(serverTime || businessDate)}</span>
+                  <div className="text-xs text-slate-400">Business Date used for postings: <span className="font-mono text-amber-500">{formatDateOnly(businessDate)}</span></div>
+                </div>
               </h2>
               <p className="text-xs text-slate-400 leading-relaxed pt-1.5 border-t border-slate-800/60">
-                All transactions posted by the front office or cashiers will be assigned to this business date.
+                Server timestamp used by the Night Audit run (auto-refreshes every second).
               </p>
             </div>
 
@@ -181,7 +233,7 @@ export default function NightAudit() {
                 </p>
                 <ul className="space-y-2 text-xs text-slate-350 list-disc list-inside">
                   <li>Post room charges for currently stayed rooms.</li>
-                  <li>Lock active business date <span className="font-mono text-amber-500">{businessDate}</span>.</li>
+                  <li>Lock active business date <span className="font-mono text-amber-500">{formatDateOnly(businessDate)}</span>.</li>
                   <li>Log out all active cashier/front-office user tokens.</li>
                 </ul>
               </div>
