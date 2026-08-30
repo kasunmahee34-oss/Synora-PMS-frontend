@@ -3,31 +3,83 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { ChevronLeft, ChevronRight, Calendar, Plus } from 'lucide-react';
 
+/**
+ * Returns today's date as a YYYY-MM-DD string in the LOCAL timezone.
+ * new Date().toISOString() gives UTC, which is "tomorrow" in UTC- zones at night.
+ */
+function localTodayStr() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Build an array of YYYY-MM-DD strings starting from startDateStr (YYYY-MM-DD),
+ * entirely in UTC so there is no local-offset drift when iterating days.
+ */
+function buildDatesArray(startDateStr, count) {
+  const dates = [];
+  // Parse as UTC midnight (YYYY-MM-DD strings parse as UTC by spec)
+  const start = new Date(startDateStr + 'T00:00:00Z');
+  for (let i = 0; i < count; i++) {
+    const d = new Date(start);
+    d.setUTCDate(start.getUTCDate() + i);
+    dates.push(d.toISOString().slice(0, 10)); // "YYYY-MM-DD"
+  }
+  return dates;
+}
+
+/**
+ * Advance a YYYY-MM-DD string by `days` days (UTC-safe).
+ */
+function shiftDateStr(dateStr, days) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Format a YYYY-MM-DD string for column header display using UTC components,
+ * so the day number and month name always match the stored calendar date.
+ */
+function formatHeaderDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  const dayName = d.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+  const dateNum = d.getUTCDate();
+  const monthName = d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' });
+  return { dayName, dateNum, monthName };
+}
+
+const STATUS_CLASSES = {
+  tentative:      'bg-amber-500/20 border-amber-500/40 hover:bg-amber-500/30 text-amber-300',
+  guaranteed:     'bg-violet-500/20 border-violet-500/40 hover:bg-violet-500/30 text-violet-300',
+  room_assigned:  'bg-blue-500/20 border-blue-500/40 hover:bg-blue-500/30 text-blue-300',
+  checked_in:     'bg-cyan-500/20 border-cyan-500/40 hover:bg-cyan-500/30 text-cyan-300',
+  in_house:       'bg-sky-500/20 border-sky-500/40 hover:bg-sky-500/30 text-sky-300',
+  early_checkout: 'bg-pink-500/20 border-pink-500/40 hover:bg-pink-500/30 text-pink-300',
+  checked_out:    'bg-emerald-500/20 border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-300',
+  closed:         'bg-slate-500/20 border-slate-500/40 hover:bg-slate-500/30 text-slate-300',
+  cancelled:      'bg-rose-500/20 border-rose-500/40 hover:bg-rose-500/30 text-rose-300',
+  no_show:        'bg-rose-500/20 border-rose-500/40 hover:bg-rose-500/30 text-rose-300',
+};
+
 const TapeChartPage = () => {
   const navigate = useNavigate();
-  
-  // Start date default to today
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [daysCount, setDaysCount] = useState(10); // Show 10 days
+
+  // Default to today in LOCAL timezone (not UTC)
+  const [startDate, setStartDate] = useState(localTodayStr());
+  const [daysCount, setDaysCount] = useState(10);
   const [rooms, setRooms] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const getDatesArray = () => {
-    const dates = [];
-    const start = new Date(startDate);
-    for (let i = 0; i < daysCount; i++) {
-      const d = new Date(start);
-      d.setDate(start.getDate() + i);
-      dates.push(d);
-    }
-    return dates;
-  };
-
-  const dates = getDatesArray();
-  const endDate = new Date(dates[dates.length - 1]);
-  endDate.setDate(endDate.getDate() + 1);
-  const endDateStr = endDate.toISOString().slice(0, 10);
+  // Build dates as YYYY-MM-DD strings using pure UTC arithmetic
+  const dates = buildDatesArray(startDate, daysCount);
+  // endDate for API: the day after the last visible column
+  const endDateStr = shiftDateStr(dates[dates.length - 1], 1);
+  const todayStr = localTodayStr();
 
   const fetchTapeChart = async () => {
     setLoading(true);
@@ -47,15 +99,13 @@ const TapeChartPage = () => {
   }, [startDate, daysCount]);
 
   const shiftDates = (days) => {
-    const current = new Date(startDate);
-    current.setDate(current.getDate() + days);
-    setStartDate(current.toISOString().slice(0, 10));
+    setStartDate(prev => shiftDateStr(prev, days));
   };
 
   const renderRoomRow = (room) => {
     const cells = [];
     const roomReservations = reservations.filter(r => r.roomId === room.id);
-    
+
     let skipCount = 0;
 
     for (let i = 0; i < dates.length; i++) {
@@ -64,28 +114,26 @@ const TapeChartPage = () => {
         continue;
       }
 
-      const currentDate = dates[i];
-      const currentDateStr = currentDate.toISOString().slice(0, 10);
+      const currentDateStr = dates[i]; // already "YYYY-MM-DD"
 
-      // Find if there is an active reservation covering this cell's date
+      // checkIn/checkOut from API may have time components (e.g. group reservations).
+      // Always use .toISOString().slice(0,10) to get the UTC calendar date.
       const activeRes = roomReservations.find(r => {
-        const checkInStr = new Date(r.checkIn).toISOString().slice(0, 10);
+        const checkInStr  = new Date(r.checkIn).toISOString().slice(0, 10);
         const checkOutStr = new Date(r.checkOut).toISOString().slice(0, 10);
         return currentDateStr >= checkInStr && currentDateStr < checkOutStr;
       });
 
       if (activeRes) {
-        const checkInDate = new Date(activeRes.checkIn);
-        const checkOutDate = new Date(activeRes.checkOut);
-        
-        // Calculate the span within our current view
-        const checkInStr = checkInDate.toISOString().slice(0, 10);
+        const checkInStr  = new Date(activeRes.checkIn).toISOString().slice(0, 10);
+        const checkOutStr = new Date(activeRes.checkOut).toISOString().slice(0, 10);
+
+        // Count how many of our visible columns this reservation spans
         let span = 0;
         let tempIndex = i;
-        
         while (tempIndex < dates.length) {
-          const tempDateStr = dates[tempIndex].toISOString().slice(0, 10);
-          if (tempDateStr >= checkInStr && tempDateStr < checkOutDate.toISOString().slice(0, 10)) {
+          const tempDateStr = dates[tempIndex];
+          if (tempDateStr >= checkInStr && tempDateStr < checkOutStr) {
             span++;
             tempIndex++;
           } else {
@@ -95,34 +143,23 @@ const TapeChartPage = () => {
 
         skipCount = span - 1;
 
+        const statusClass = STATUS_CLASSES[activeRes.status] || 'bg-slate-800 border-slate-700 text-slate-400';
+
         cells.push(
           <td
-            key={`res-${activeRes.id}`}
+            key={`res-${activeRes.id}-${i}`}
             colSpan={span}
             onClick={() => navigate(`/reservations?newConfo=${activeRes.confoNo}`)}
             className="p-1.5 cursor-pointer align-middle"
           >
-            <div className={`h-12 px-3 rounded-xl flex flex-col justify-center border text-xs font-semibold shadow-sm transition-all duration-300 ${
-             activeRes.status === 'tentative' ? 'bg-amber-500/20 border-amber-500/40 hover:bg-amber-500/30 text-amber-300 hover:scale-[0.99]' :
-              activeRes.status === 'guaranteed' ? 'bg-violet-500/20 border-violet-500/40 hover:bg-violet-500/30 text-violet-300 hover:scale-[0.99]' :
-              activeRes.status === 'room_assigned' ? 'bg-blue-500/20 border-blue-500/40 hover:bg-blue-500/30 text-blue-300 hover:scale-[0.99]' :
-             activeRes.status === 'checked_in' ? 'bg-cyan-500/20 border-cyan-500/40 hover:bg-cyan-500/30 text-cyan-300 hover:scale-[0.99]' :
-              activeRes.status === 'in_house' ? 'bg-sky-500/20 border-sky-500/40 hover:bg-sky-500/30 text-sky-300 hover:scale-[0.99]' :
-              activeRes.status === 'early_checkout' ? 'bg-pink-500/20 border-pink-500/40 hover:bg-pink-500/30 text-pink-300 hover:scale-[0.99]' :
-              activeRes.status === 'checked_out' ? 'bg-emerald-500/20 border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-300 hover:scale-[0.99]' :
-             activeRes.status === 'closed' ? 'bg-slate-500/20 border-slate-500/40 hover:bg-slate-500/30 text-slate-300 hover:scale-[0.99]' :
-             activeRes.status === 'cancelled' || activeRes.status === 'no_show' ? 'bg-rose-500/20 border-rose-500/40 hover:bg-rose-500/30 text-rose-300 hover:scale-[0.99]' :
-             'bg-slate-800 border-slate-700 text-slate-400 hover:scale-[0.99]'
-            }`}>
+            <div className={`h-12 px-3 rounded-xl flex flex-col justify-center border text-xs font-semibold shadow-sm transition-all duration-300 hover:scale-[0.99] ${statusClass}`}>
               <p className="truncate font-bold text-slate-100">{activeRes.guest.fullName}</p>
               <p className="text-[9px] opacity-75 truncate">{activeRes.confoNo}</p>
             </div>
           </td>
         );
       } else {
-        const nextDay = new Date(currentDate);
-        nextDay.setDate(nextDay.getDate() + 1);
-        const nextDayStr = nextDay.toISOString().slice(0, 10);
+        const nextDayStr = shiftDateStr(currentDateStr, 1);
 
         cells.push(
           <td
@@ -155,7 +192,7 @@ const TapeChartPage = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">Interactive Tape Chart</h1>
-          <p className="text-slate-400 text-sm mt-1">Room allocation grid. Double-click reservations to inspect, click empty slots to book.</p>
+          <p className="text-slate-400 text-sm mt-1">Room allocation grid. Click reservations to inspect, click empty slots to book.</p>
         </div>
 
         {/* Chart Navigation controls */}
@@ -211,14 +248,12 @@ const TapeChartPage = () => {
                   <th className="p-4 border-r border-slate-800/80 sticky left-0 bg-slate-900 font-bold text-xs uppercase text-slate-400 w-44 z-20">
                     Rooms / Dates
                   </th>
-                  {dates.map((date) => {
-                    const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-                    const dateNum = date.getDate();
-                    const monthName = date.toLocaleDateString('en-US', { month: 'short' });
-                    const isToday = new Date().toISOString().slice(0, 10) === date.toISOString().slice(0, 10);
+                  {dates.map((dateStr) => {
+                    const { dayName, dateNum, monthName } = formatHeaderDate(dateStr);
+                    const isToday = dateStr === todayStr;
                     return (
                       <th
-                        key={date.toISOString()}
+                        key={dateStr}
                         className={`p-3 border-r border-slate-850 text-center w-24 text-xs select-none ${
                           isToday ? 'bg-amber-500/10 text-amber-400 font-bold' : 'text-slate-400 font-semibold'
                         }`}

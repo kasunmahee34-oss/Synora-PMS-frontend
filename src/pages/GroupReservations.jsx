@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../api';
 import mealPlanApi from '../api/mealPlans';
+import { formatUtcDate } from '../utils/dateUtils';
 
 const emptyRoomLine = () => ({ roomTypeId: '', quantity: 1 });
 
@@ -114,8 +115,7 @@ const GroupReservations = () => {
 
   const formatDate = (dateValue) => {
     if (!dateValue) return '—';
-    const parsed = new Date(dateValue);
-    return Number.isNaN(parsed.getTime()) ? dateValue : parsed.toLocaleDateString();
+    return formatUtcDate(dateValue);
   };
 
   return (

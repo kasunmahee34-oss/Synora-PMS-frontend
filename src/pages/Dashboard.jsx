@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../api';
 import { normalizeReservationStatus, getReservationStatusClasses, formatReservationStatus } from '../utils/reservationStatus';
+import { formatUtcDate } from '../utils/dateUtils';
 import { 
   Users, 
   Calendar, 
@@ -223,7 +224,7 @@ const Dashboard = () => {
                           Room {res.room.roomNumber} ({res.room.roomType.typeName})
                         </td>
                         <td className="py-3.5 text-xs text-slate-400">
-                          {new Date(res.checkIn).toLocaleDateString()} – {new Date(res.checkOut).toLocaleDateString()}
+                          {formatUtcDate(res.checkIn)} – {formatUtcDate(res.checkOut)}
                         </td>
                         <td className="py-3.5">
                           <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${getReservationStatusClasses(res.status)}`}>

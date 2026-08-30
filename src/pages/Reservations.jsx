@@ -24,6 +24,7 @@ import {
 
 import { isReservationLocked } from '../utils/reservationGuards';
 import { formatReservationStatus, getReservationStatusClasses, normalizeReservationStatus } from '../utils/reservationStatus';
+import { formatUtcDate, formatUtcDateGB } from '../utils/dateUtils';
 import CheckoutAction from '../components/CheckoutAction/CheckoutAction';
 
 const Reservations = () => {
@@ -107,12 +108,25 @@ const Reservations = () => {
       const res = await api.get(`/reservations?search=${search}&status=${statusFilter}&startDate=${start}&endDate=${end}`);
       setReservations(res.data);
       
-      // Auto highlight/open details if confoNo matches highlight
-      if (highlightConfo) {
-        const found = res.data.find(r => r.confoNo === highlightConfo);
-        if (found) {
-          setSelectedRes(found);
+      // Auto-select a reservation to show its folio according to the active date filter.
+      // Priority: highlightConfo (if provided) -> keep currently selected (if still present) -> first result.
+      if (res.data && res.data.length > 0) {
+        if (highlightConfo) {
+          const found = res.data.find(r => r.confoNo === highlightConfo);
+          if (found) {
+            setSelectedRes(found);
+            // Fetch folio immediately for snappier UI (useEffect will also run on selectedRes change)
+            try { fetchFolio(found.id); } catch (err) { /* graceful */ }
+          } else if (!selectedRes || !res.data.find(r => r.id === selectedRes.id)) {
+            setSelectedRes(res.data[0]);
+            try { fetchFolio(res.data[0].id); } catch (err) { /* graceful */ }
+          }
+        } else if (!selectedRes || !res.data.find(r => r.id === selectedRes.id)) {
+          setSelectedRes(res.data[0]);
+          try { fetchFolio(res.data[0].id); } catch (err) { /* graceful */ }
         }
+      } else {
+        setSelectedRes(null);
       }
     } catch (e) {
       console.error(e);
@@ -685,11 +699,13 @@ const Reservations = () => {
 
   const isCheckoutToday = (res) => {
     if (!res?.checkOut) return false;
+    // checkOut is stored as UTC midnight. Read its UTC date components so it
+    // isn't shifted back one day in UTC-negative timezones (same fix as backend).
     const checkout = new Date(res.checkOut);
     const today = new Date();
-    return checkout.getFullYear() === today.getFullYear()
-      && checkout.getMonth() === today.getMonth()
-      && checkout.getDate() === today.getDate();
+    return checkout.getUTCFullYear() === today.getFullYear()
+      && checkout.getUTCMonth() === today.getMonth()
+      && checkout.getUTCDate() === today.getDate();
   };
 
   const isPendingCheckout = (res) => {
@@ -915,7 +931,7 @@ const Reservations = () => {
                       <h3 className="font-bold text-slate-200 mt-2 text-base">{res.guest.fullName}</h3>
                       <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
                         <Calendar size={12} className="text-slate-500" />
-                        {new Date(res.checkIn).toLocaleDateString()} to {new Date(res.checkOut).toLocaleDateString()}
+                        {formatUtcDate(res.checkIn)} to {formatUtcDate(res.checkOut)}
                         <span className="text-slate-600">|</span>
                         <span>{getReservationNights(res)} Night(s)</span>
                       </p>

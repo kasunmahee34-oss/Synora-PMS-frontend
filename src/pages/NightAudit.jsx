@@ -28,6 +28,7 @@ export default function NightAudit() {
   const [businessDate, setBusinessDate] = useState('');
   const [serverTime, setServerTime] = useState(null); // Date object kept in sync locally
   const [lastAudit, setLastAudit] = useState(null);
+  const [todayAlreadyCompleted, setTodayAlreadyCompleted] = useState(false);
   const [pendingArrivals, setPendingArrivals] = useState([]);
   const [pendingDepartures, setPendingDepartures] = useState([]);
   const [history, setHistory] = useState([]);
@@ -41,6 +42,7 @@ export default function NightAudit() {
       const data = await fetchNightAuditStatus();
       setBusinessDate(data.businessDate);
       setLastAudit(data.lastAudit);
+      setTodayAlreadyCompleted(!!data.todayAlreadyCompleted);
       setPendingArrivals(data.pendingArrivals);
       setPendingDepartures(data.pendingDepartures);
       
@@ -58,29 +60,14 @@ export default function NightAudit() {
     loadStatus();
   }, []);
 
-  // Keep a local, ticking serverTime so the UI updates every second without polling the API.
+  // Tick the local browser clock every second for the live clock display.
+  // businessDate is now a date-only string (YYYY-MM-DD) from the server, so we
+  // cannot use it as a timestamp seed — we use the browser's own clock instead.
   useEffect(() => {
-    // Initialize serverTime from businessDate when it arrives.
-    if (!businessDate) {
-      setServerTime(null);
-      return;
-    }
-    const initial = new Date(businessDate);
-    if (Number.isNaN(initial.getTime())) {
-      setServerTime(null);
-      return;
-    }
-    setServerTime(initial);
-
-    const id = setInterval(() => {
-      setServerTime(prev => {
-        if (!prev) return new Date();
-        return new Date(prev.getTime() + 1000);
-      });
-    }, 1000);
-
+    setServerTime(new Date());
+    const id = setInterval(() => setServerTime(new Date()), 1000);
     return () => clearInterval(id);
-  }, [businessDate]);
+  }, []);
 
   const handleRunAudit = async () => {
     const hasWarnings = pendingArrivals.length > 0 || pendingDepartures.length > 0;
@@ -130,7 +117,9 @@ export default function NightAudit() {
     if (!value) return 'N/A';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleDateString();
+    // Force UTC so a UTC-midnight date (e.g. auditDate stored as 2026-09-01T00:00:00Z)
+    // never renders as the previous day in UTC- browser timezones.
+    return date.toLocaleDateString(undefined, { timeZone: 'UTC' });
   };
 
   const formatTimeOnly = (value) => {
@@ -178,16 +167,17 @@ export default function NightAudit() {
           <div className="lg:col-span-1 space-y-6">
             {/* Active Business Date Card */}
             <div className="glass-card p-6 rounded-2xl border-l-4 border-amber-500 space-y-4">
-              <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest block">Server Date & Time</span>
+              <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest block">Current Date & Time</span>
               <h2 className="text-xl font-extrabold text-slate-100 flex items-center gap-3">
                 <Calendar className="text-amber-400" size={20} />
                 <div>
-                  <span className="text-lg font-semibold">{formatBusinessDateTime(serverTime || businessDate)}</span>
-                  <div className="text-xs text-slate-400">Business Date used for postings: <span className="font-mono text-amber-500">{formatDateOnly(businessDate)}</span></div>
+                  <span className="text-lg font-semibold">{formatBusinessDateTime(serverTime)}</span>
+                  <div className="text-xs text-slate-400">Active Business Date: <span className="font-mono text-amber-500">{formatDateOnly(businessDate)}</span></div>
                 </div>
               </h2>
               <p className="text-xs text-slate-400 leading-relaxed pt-1.5 border-t border-slate-800/60">
-                Server timestamp used by the Night Audit run (auto-refreshes every second).
+                Active business date is derived from the last completed Night Audit.
+                Room charges and postings will be applied to this date.
               </p>
             </div>
 
@@ -198,7 +188,7 @@ export default function NightAudit() {
                 <div className="space-y-3.5 text-xs text-slate-350">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Audited Date:</span>
-                    <span className="font-semibold text-slate-200">{new Date(lastAudit.auditDate).toLocaleDateString()}</span>
+                    <span className="font-semibold text-slate-200">{formatDateOnly(lastAudit.auditDate)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Completed By:</span>
@@ -227,34 +217,57 @@ export default function NightAudit() {
             {/* Run Actions Card */}
             <div className="glass-card p-6 rounded-2xl space-y-5">
               <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Execute Day Close</span>
-              <div className="space-y-3">
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Ready to close out the day? This operation is irreversible and will execute the following steps:
-                </p>
-                <ul className="space-y-2 text-xs text-slate-350 list-disc list-inside">
-                  <li>Post room charges for currently stayed rooms.</li>
-                  <li>Lock active business date <span className="font-mono text-amber-500">{formatDateOnly(businessDate)}</span>.</li>
-                  <li>Log out all active cashier/front-office user tokens.</li>
-                </ul>
-              </div>
 
-              <button
-                onClick={handleRunAudit}
-                disabled={submitting}
-                className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2.5 transition shadow-lg shadow-amber-500/10"
-              >
-                {submitting ? (
-                  <>
-                    <RefreshCw className="animate-spin" size={14} />
-                    Processing Audit...
-                  </>
-                ) : (
-                  <>
-                    <Play size={14} fill="currentColor" />
-                    Close Day & Run Audit
-                  </>
-                )}
-              </button>
+              {todayAlreadyCompleted ? (
+                /* Today's audit is already done — show a clear status instead of the run button */
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2.5 p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                    <CheckCircle size={16} className="text-emerald-400 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-emerald-400">Today's Night Audit is Complete</p>
+                      <p className="text-[10px] text-emerald-600 mt-0.5">
+                        Business date <span className="font-mono">{formatDateOnly(businessDate)}</span> has already been closed. Come back tomorrow.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    disabled
+                    className="w-full py-3 bg-slate-800 opacity-50 text-slate-500 font-bold rounded-xl text-xs flex items-center justify-center gap-2.5 cursor-not-allowed"
+                  >
+                    <CheckCircle size={14} />
+                    Audit Already Completed
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Ready to close out the day? This operation is irreversible and will execute the following steps:
+                  </p>
+                  <ul className="space-y-2 text-xs text-slate-350 list-disc list-inside">
+                    <li>Post room charges for currently stayed rooms.</li>
+                    <li>Lock active business date <span className="font-mono text-amber-500">{formatDateOnly(businessDate)}</span>.</li>
+                    <li>Log out all active cashier/front-office user tokens.</li>
+                  </ul>
+
+                  <button
+                    onClick={handleRunAudit}
+                    disabled={submitting}
+                    className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2.5 transition shadow-lg shadow-amber-500/10"
+                  >
+                    {submitting ? (
+                      <>
+                        <RefreshCw className="animate-spin" size={14} />
+                        Processing Audit...
+                      </>
+                    ) : (
+                      <>
+                        <Play size={14} fill="currentColor" />
+                        Close Day &amp; Run Audit
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -389,7 +402,7 @@ export default function NightAudit() {
               <tbody className="divide-y divide-slate-850">
                 {history.map((audit) => (
                   <tr key={audit.id} className="hover:bg-slate-900/30 transition-colors">
-                    <td className="py-3 font-semibold text-slate-200">{new Date(audit.auditDate).toLocaleDateString()}</td>
+                    <td className="py-3 font-semibold text-slate-200">{formatDateOnly(audit.auditDate)}</td>
                     <td className="py-3 text-slate-400">{new Date(audit.completedAt).toLocaleString()}</td>
                     <td className="py-3 text-slate-400">{audit.user?.fullName || audit.user?.username || 'System'}</td>
                     <td className="py-3 text-center font-mono text-slate-300">{audit.tentativeReviewed}</td>
@@ -425,7 +438,7 @@ export default function NightAudit() {
               <div>
                 <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
                   <Moon className="text-amber-500" size={20} />
-                  Night Audit Details — {new Date(selectedAudit.auditDate).toLocaleDateString()}
+                  Night Audit Details — {formatDateOnly(selectedAudit.auditDate)}
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">
                   Completed on {new Date(selectedAudit.completedAt).toLocaleString()} by {selectedAudit.user?.fullName || selectedAudit.user?.username || 'System'}

@@ -9,7 +9,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"
-  },
+  },  
   "dependencies": {
     "autoprefixer": "^10.5.4",
     "axios": "^1.19.0",
