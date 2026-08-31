@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   //baseURL: 'http://localhost:5000/api',
-   baseURL: 'https://synora-pms-backend-production.up.railway.app/api', // Replace with your production API URL
+   baseURL: 'https://synora-bk-production-bac0.up.railway.app/api', // Replace with your production API URL
 });
 
 api.interceptors.request.use((config) => {
