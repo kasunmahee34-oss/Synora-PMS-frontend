@@ -24,6 +24,7 @@ const Layout = ({ children }) => {
     { name: 'Night Audit', path: '/night-audit', icon: Moon, roles: ['admin', 'front_office'], permission: 'night_audit.run' },
     { name: 'Reports', path: '/reports', icon: PieChart, roles: ['admin', 'front_office', 'cashier'], permission: 'reports.view' },
     { name: 'Administration', path: '/administration', icon: ShieldCheck, permission: 'users.view' },
+    { name: 'Pos View', href: 'http://localhost:5174/outlets/1', icon: Briefcase, external: true, roles: ['admin', 'front_office', 'cashier'], permission: 'reservations.view' },
   ];
 
   const handleLogout = () => {
@@ -76,7 +77,21 @@ const Layout = ({ children }) => {
               .filter(item => user && (!item.roles || item.roles.includes(user.role)) && hasPermission(item.permission))
               .map(item => {
                 const Icon = item.icon;
-                const isActive = location.pathname === item.path;
+                const isActive = !item.external && location.pathname === item.path;
+                if (item.external) {
+                  return (
+                    <a
+                      key={item.name}
+                      href={item.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 text-slate-400 hover:bg-slate-800/50 hover:text-slate-100"
+                    >
+                      <Icon size={18} className="text-slate-400" />
+                      {item.name}
+                    </a>
+                  );
+                }
                 return (
                   <Link
                     key={item.name}
@@ -134,7 +149,22 @@ const Layout = ({ children }) => {
                   .filter(item => user && (!item.roles || item.roles.includes(user.role)) && hasPermission(item.permission))
                   .map(item => {
                     const Icon = item.icon;
-                    const isActive = location.pathname === item.path;
+                    const isActive = !item.external && location.pathname === item.path;
+                    if (item.external) {
+                      return (
+                        <a
+                          key={item.name}
+                          href={item.href}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3.5 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 text-slate-400 hover:bg-slate-800/50 hover:text-slate-100"
+                        >
+                          <Icon size={18} className="text-slate-400" />
+                          {item.name}
+                        </a>
+                      );
+                    }
                     return (
                       <Link
                         key={item.name}

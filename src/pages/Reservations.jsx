@@ -98,43 +98,6 @@ const Reservations = () => {
   const [savingDates, setSavingDates] = useState(false);
   const [dateError, setDateError] = useState('');
 
-  const fetchReservations = async () => {
-    setLoading(true);
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const start = dateFrom || today;
-      const end = dateTo || today;
-      console.log('Fetching reservations with URL:', `/reservations?search=${search}&status=${statusFilter}&startDate=${start}&endDate=${end}`);
-      const res = await api.get(`/reservations?search=${search}&status=${statusFilter}&startDate=${start}&endDate=${end}`);
-      setReservations(res.data);
-      
-      // Auto-select a reservation to show its folio according to the active date filter.
-      // Priority: highlightConfo (if provided) -> keep currently selected (if still present) -> first result.
-      if (res.data && res.data.length > 0) {
-        if (highlightConfo) {
-          const found = res.data.find(r => r.confoNo === highlightConfo);
-          if (found) {
-            setSelectedRes(found);
-            // Fetch folio immediately for snappier UI (useEffect will also run on selectedRes change)
-            try { fetchFolio(found.id); } catch (err) { /* graceful */ }
-          } else if (!selectedRes || !res.data.find(r => r.id === selectedRes.id)) {
-            setSelectedRes(res.data[0]);
-            try { fetchFolio(res.data[0].id); } catch (err) { /* graceful */ }
-          }
-        } else if (!selectedRes || !res.data.find(r => r.id === selectedRes.id)) {
-          setSelectedRes(res.data[0]);
-          try { fetchFolio(res.data[0].id); } catch (err) { /* graceful */ }
-        }
-      } else {
-        setSelectedRes(null);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const fetchFolio = async (id) => {
     setFolioLoading(true);
     try {
@@ -157,7 +120,42 @@ const Reservations = () => {
   };
 
   useEffect(() => {
-    fetchReservations();
+    // Initial load: fetch with today's date
+    const today = new Date().toISOString().split('T')[0];
+    const start = dateFrom || today;
+    const end = dateTo || today;
+    
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const res = await api.get(`/reservations?search=${search}&status=${statusFilter}&startDate=${start}&endDate=${end}`);
+        setReservations(res.data);
+        
+        if (res.data && res.data.length > 0) {
+          if (highlightConfo) {
+            const found = res.data.find(r => r.confoNo === highlightConfo);
+            if (found) {
+              setSelectedRes(found);
+              try { fetchFolio(found.id); } catch (err) { /* graceful */ }
+            } else if (!selectedRes || !res.data.find(r => r.id === selectedRes.id)) {
+              setSelectedRes(res.data[0]);
+              try { fetchFolio(res.data[0].id); } catch (err) { /* graceful */ }
+            }
+          } else if (!selectedRes || !res.data.find(r => r.id === selectedRes.id)) {
+            setSelectedRes(res.data[0]);
+            try { fetchFolio(res.data[0].id); } catch (err) { /* graceful */ }
+          }
+        } else {
+          setSelectedRes(null);
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
     fetchChargeTypes();
   }, [search, statusFilter, dateFrom, dateTo]);
 
@@ -847,7 +845,7 @@ const Reservations = () => {
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
                 onClick={(e) => e.target.showPicker?.()}
-                className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl text-slate-200 text-sm outline-none cursor-pointer"
+                className="flex-1 min-w-0 px-4 py-2.5 bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl text-slate-200 text-sm outline-none cursor-pointer"
                 style={{ colorScheme: 'dark' }}
                 required
               />
@@ -857,7 +855,7 @@ const Reservations = () => {
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
                 onClick={(e) => e.target.showPicker?.()}
-                className="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl text-slate-200 text-sm outline-none cursor-pointer"
+                className="flex-1 min-w-0 px-4 py-2.5 bg-slate-900 border border-slate-800 focus:border-amber-500 rounded-xl text-slate-200 text-sm outline-none cursor-pointer"
                 style={{ colorScheme: 'dark' }}
                 required
               />

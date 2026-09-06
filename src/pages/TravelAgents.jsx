@@ -378,7 +378,7 @@ const TravelAgents = () => {
                                 {group.rates.map((rate) => (
                                   <div
                                     key={rate.id}
-                                    className="p-4 bg-slate-950/40 border border-slate-800/80 rounded-xl flex justify-between items-center text-sm group hover:border-slate-700 transition-all duration-300"
+                                    className="p-4 bg-slate-950/40 border border-slate-800/80 rounded-xl flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 text-sm group hover:border-slate-700 transition-all duration-300"
                                   >
                                     <div className="flex-1 min-w-0">
                                       <div className="font-bold text-slate-200 flex flex-wrap items-center gap-2">
@@ -407,11 +407,11 @@ const TravelAgents = () => {
                                         {new Date(rate.startDate).toLocaleDateString()} to {new Date(rate.endDate).toLocaleDateString()}
                                       </p>
                                     </div>
-                                    <div className="text-right mr-4">
+                                    <div className="sm:ml-4 flex-shrink-0 text-right">
                                       <span className="font-mono font-bold text-amber-400 text-base">LKR {rate.rate.toLocaleString()}</span>
                                       <span className="text-[10px] text-slate-500 block">per night</span>
                                     </div>
-                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                    <div className="mt-2 sm:mt-0 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex-shrink-0">
                                       <button
                                         onClick={() => handleEditRate(rate)}
                                         className="p-2 bg-slate-800 hover:bg-slate-700 text-amber-400 rounded-lg transition-all duration-300"
