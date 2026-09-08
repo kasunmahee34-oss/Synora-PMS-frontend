@@ -24,7 +24,7 @@ const Layout = ({ children }) => {
     { name: 'Night Audit', path: '/night-audit', icon: Moon, roles: ['admin', 'front_office'], permission: 'night_audit.run' },
     { name: 'Reports', path: '/reports', icon: PieChart, roles: ['admin', 'front_office', 'cashier'], permission: 'reports.view' },
     { name: 'Administration', path: '/administration', icon: ShieldCheck, permission: 'users.view' },
-    { name: 'Pos View', href: 'https://synora-pos-frontend-production.up.railway.app/outlets/1', icon: Briefcase, external: true, roles: ['admin', 'front_office', 'cashier'], permission: 'reservations.view' },
+    { name: 'Pos View', href: 'https://synora-pos-frontend-production.up.railway.app', icon: Briefcase, external: true, roles: ['admin', 'front_office', 'cashier'], permission: 'reservations.view' },
   ];
 
   const handleLogout = () => {
